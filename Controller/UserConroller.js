@@ -2,7 +2,7 @@ const User = require("../Model/userSchema");
 const { sendOtpMail } = require('../Config/nodeMailer')
 const jwt = require("jsonwebtoken");
 const mongoose = require('mongoose');
-const { putObjects } = require("../Config/putObjects");
+const { uploadToS3 } = require('../Config/s3-uploads');
 
 // Temporary OTP storage
 const otpStore = new Map(); // { "email": { otp: "123456", expiresAt: Date } }
@@ -157,45 +157,43 @@ exports.getSearchUser = async (req, res) => {
 };
 
 
+
 exports.updateProfile = async (req, res) => {
-  try {
-    const { userId } = req.body; // Extract user ID correctly
-    const file = req.files?.file; // Ensure file exists
+    console.log("Inside image update controller");
 
-    if (!file) {
-      return res.status(400).json({ message: "No file uploaded" });
+    try {
+        const { userId } = req.body;
+        const file = req.file; 
+
+        if (!file) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        // Upload to S3
+        const { url } = await uploadToS3(file);
+
+        // Update user profile image in the database
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { profileImg: url },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(200).json({
+            message: "Profile updated successfully",
+            user: updatedUser,
+            imageUrl: url
+        });
+    } catch (error) {
+        console.error("Error updating profile:", error);
+        res.status(500).json({ message: "Server Error", error: error.message });
     }
-
-    // Generate unique filename
-    const fileName = `images/${uuidv4()}.${file.mimetype.split("/")[1]}`;
-
-    // Upload to S3
-    const { url, key } = await putObjects(file.data, fileName, file.mimetype);
-    if (!url) {
-      return res.status(500).json({ message: "S3 upload failed" });
-    }
-
-    // Update user profile image in the database
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { profileImage: url },
-      { new: true }
-    );
-
-    if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json({
-      message: "Profile updated successfully",
-      user: updatedUser,
-      imageUrl: url,
-    });
-  } catch (error) {
-    console.error("Error updating profile:", error);
-    res.status(500).json({ message: "Server Error", error: error.message });
-  }
 };
+
 
 exports.updateUsername = async (req, res) => {
   try {

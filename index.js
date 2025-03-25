@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const fileUpload = require("express-fileupload"); 
 const { createServer } = require('http');
 const authRoutes = require('./Router/authRoutes');
 const userRoutes = require('./Router/userRoutes')
@@ -11,8 +10,8 @@ const ChatApp = express();
 const server = createServer(ChatApp);
 
 ChatApp.use(cors());
+
 ChatApp.use(express.json());
-ChatApp.use(fileUpload());
 ChatApp.use("/auth", authRoutes);
 ChatApp.use("/user", userRoutes);
 
